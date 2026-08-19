@@ -1,0 +1,41 @@
+name: CD - Deploy to EC2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Deploy application
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            echo "Starting deployment..."
+
+            echo "Pulling latest image..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest
+
+            echo "Stopping old container..."
+            docker stop action-demo-container || true
+
+            echo "Removing old container..."
+            docker rm action-demo-container || true
+
+            echo "Starting new container..."
+            docker run -d \
+              --name action-demo-container \
+              -p 5000:5000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest
+
+            echo "Deployment completed!"
+
+            echo "Running containers:"
+            docker ps
