@@ -3,14 +3,31 @@ name: CD - Deploy to EC2
 on:
   workflow_dispatch:
 
+    inputs:
+      build_id:
+        description: "Git Commit SHA / Build ID to deploy"
+        required: true
+        type: string
+
 jobs:
+
   deploy:
-    name: Deploy to EC2
+    name: Deploy Build to EC2
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Deploy application
+      # 1. Display selected build
+      - name: Display deployment information
+        run: |
+          echo "======================================"
+          echo "Starting deployment"
+          echo "Build ID: ${{ inputs.build_id }}"
+          echo "Image: ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:${{ inputs.build_id }}"
+          echo "======================================"
+
+      # 2. Deploy to EC2
+      - name: Deploy application to EC2
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -18,24 +35,36 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
 
           script: |
-            echo "Starting deployment..."
+            echo "Connected to EC2"
 
-            echo "Pulling latest image..."
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:${{ inputs.build_id }}"
+            CONTAINER="action-demo-container"
+
+            echo "Deploying image:"
+            echo "$IMAGE"
+
+            echo "Pulling Docker image..."
+            docker pull "$IMAGE"
 
             echo "Stopping old container..."
-            docker stop action-demo-container || true
+            docker stop "$CONTAINER" || true
 
             echo "Removing old container..."
-            docker rm action-demo-container || true
+            docker rm "$CONTAINER" || true
 
             echo "Starting new container..."
             docker run -d \
-              --name action-demo-container \
+              --name "$CONTAINER" \
               -p 5000:5000 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest
+              "$IMAGE"
 
-            echo "Deployment completed!"
+            echo "Waiting for application..."
+            sleep 5
 
-            echo "Running containers:"
+            echo "Checking container..."
             docker ps
+
+            echo "======================================"
+            echo "Deployment completed"
+            echo "Build ID: ${{ inputs.build_id }}"
+            echo "======================================"

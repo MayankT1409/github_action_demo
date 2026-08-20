@@ -12,9 +12,17 @@ jobs:
 
     steps:
 
+      # 1. Checkout source code
       - name: Checkout source code
         uses: actions/checkout@v4
 
+      # 2. Create Build ID from Git commit SHA
+      - name: Set Build ID
+        run: |
+          echo "BUILD_ID=${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "Build ID: ${GITHUB_SHA}"
+
+      # 3. Check Docker Hub credentials
       - name: Check Docker Hub credentials
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -32,18 +40,42 @@ jobs:
 
           echo "Docker Hub credentials are available"
 
+      # 4. Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # 5. Build Docker image using Build ID
       - name: Build Docker image
         run: |
           docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest .
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:${BUILD_ID} .
 
-      - name: Push Docker image
+      # 6. Push versioned image
+      - name: Push versioned Docker image
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:${BUILD_ID}
+
+      # 7. Also tag the same image as latest
+      - name: Tag image as latest
+        run: |
+          docker tag \
+            ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:${BUILD_ID} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest
+
+      # 8. Push latest
+      - name: Push latest Docker image
         run: |
           docker push \
             ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:latest
+
+      # 9. Display Build ID
+      - name: Display Build ID
+        run: |
+          echo "======================================"
+          echo "BUILD ID: ${BUILD_ID}"
+          echo "IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/action-demo-app:${BUILD_ID}"
+          echo "======================================"
